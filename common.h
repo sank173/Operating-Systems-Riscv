@@ -5,4 +5,34 @@
 #define va_end   __builtin_va_end
 #define va_arg   __builtin_va_arg
 
+
+// typedef int bool;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef uint32_t size_t;
+// the type representing the physical memory
+typedef uint32_t paddr_t;
+// the type representing the virtual memory
+typedef uint32_t vaddr_t;
+
+#define true 1 
+#define false 0
+#define NULL ((void *) 0)
+// align should be the power of 2 
+#define align_up(value,align) __builtin_align_up(value,align)
+#define is_aligned(value, align) __builtin_is_aligned(value,align)
+// Returns the offset of a member within a structure (how many bytes from the start of the structure).
+#define offsetof(type,member)  __builtin_offsetof(type,member)
+
+// copies the n bytes to the buffer 
+void *memset(void*buf, char c, size_t n);
+// copies the n bytes from the destination to source
+void *memcpy(void* dst , const void* src, size_t n);
+// copies string from source to destination
+char *strcpy(char *dst , const char* src);
+// string compare , compare the string , returns 0 if the string are same or else returns 1
+int strcmp(const char* s1 , const char *s2);
+
 void printf(const char *fmt, ...);
