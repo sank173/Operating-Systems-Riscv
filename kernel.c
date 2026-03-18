@@ -6,6 +6,21 @@ typedef unsigned int uint32_t;
 typedef uint32_t size_t;
 
 extern char __bss[], __bss_end[], __stack_top[];
+extern char __free_ram[], __free_ram_end[];
+
+paddr_t alloc_pages(uint32_t n){
+    /* make the next_addr variable non changeable between the function calls , thus making it kind of global variable*/
+    
+    static paddr_t next_addr = (paddr_t) __free_ram;
+    paddr_t paddr = next_addr;
+    next_addr += n*PAGE_SIZE;
+    if(next_addr > __free_ram_end){
+         PANIC("Out of Memory\n");
+    }
+    memset((void *) paddr , 0 , n*PAGE_SIZE);
+    return paddr;
+
+}
 
 /**
  * sscratch register is used as a temporary storage to save the stack pointer at the time of exception occurrence, which is later restored.
@@ -137,18 +152,14 @@ void kernel_main(void)
 {
     /* intializing the bss section with default 0s*/
     memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
-    WRITE_CSR(stvec, (uint32_t) kernel_entry); // new
-    /* unimp causes illegal instruction execption as it is pseudo instruction for csrrw x0, cycle, x0 , we are reading and writing the cycle and writing to cycle is illegal in riscv */
-    __asm__ __volatile__("unimp"); // new
+
+    paddr_t paddr0 = alloc_pages(2);
+    paddr_t paddr1 = alloc_pages(1);
+    printf("alloc_pages test: paddr0=%x\n", paddr0);
+    printf("alloc_pages test: paddr1=%x\n", paddr1);
+
     PANIC("booted!");
-    printf("unreachable here!\n");
-
-    printf("\n\nHello %s\n", "World!");
-    printf("1 + 2 = %d, %x\n", 1 + 2, 0x1234abcd);
-
-    for (;;) {
-        __asm__ __volatile__("wfi");
-    }
+   
 }
 
 /* place the function compiled to .text.boot section in the linker*/
