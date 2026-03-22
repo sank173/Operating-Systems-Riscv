@@ -73,7 +73,7 @@ __attribute__((naked))
 __attribute__((aligned(4)))
 void kernel_entry(void){
     __asm__ __volatile__(
-        "csrw sscratch , sp\n"
+        "csrrw sp , sscratch , sp\n"
         "addi sp, sp, -4*31\n"
         "sw ra, 4* 0(sp)\n"
         "sw gp, 4* 1(sp)\n"
@@ -108,6 +108,9 @@ void kernel_entry(void){
 
         "csrr a0,sscratch\n"
         "sw a0, 4 * 30(sp)\n"
+
+        "addi a0, sp , 4*31\n"
+        "csrw sscratch ,a0\n"
 /* The first argument to a function must be in register a0 The First argument should be in a0 before calling the handle_trap*/
         "mv a0 , sp \n"
         "call handle_trap\n"
@@ -254,6 +257,12 @@ void yeild(void){
          return;
     }
 
+    __asm__ __volatile__(
+        "csrw sscratch , %[sscratch]\n"
+        :
+        : [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
+    );
+
     struct process *prev = current_proc;
     current_proc = next;
     switch_context(&prev->sp , &next->sp);
@@ -264,9 +273,7 @@ void proc_a_entry(void) {
     printf("starting process A\n");
     while (1) {
         putchar('A');
-        // yeild();
-        switch_context(&proc_a->sp , &proc_b->sp);
-        delay(); 
+        yeild();
     }
 }
 
@@ -274,9 +281,7 @@ void proc_b_entry(void) {
     printf("starting process B\n");
     while (1) {
         putchar('B');
-        // yeild();
-        switch_context(&proc_b->sp , &proc_a->sp);
-        delay(); 
+        yeild();
     }
 }
 /**
@@ -288,15 +293,19 @@ void kernel_main(void)
 
     WRITE_CSR(stvec, (uint32_t) kernel_entry);
 
-    // idle_proc = create_process((uint32_t) NULL);
-    // idle_proc->pid = 0;
-    // current_proc = idle_proc;
+    idle_proc = create_process((uint32_t) NULL);
+    idle_proc->pid = 0;
+    current_proc = idle_proc;
 
     proc_a = create_process((uint32_t) proc_a_entry);
     proc_b = create_process((uint32_t) proc_b_entry);
-    // yeild();
-    proc_a_entry();
-    PANIC("unreachable here!");
+    /** 
+     * Usual flow is that we yield , we make the next process as process A , and previous process is idle process, we enter the switch context , make ra(return address) as the proc_a_entry
+     * now we enter the proc_a_entry and yeild again , we make the next process as B and previous process as A , switch context , move to process B , again yeild and making the process A as next and process B as previous process
+     * printing ABABAB...
+    */
+    yeild();
+    PANIC("switched to idle process");
    
 }
 
