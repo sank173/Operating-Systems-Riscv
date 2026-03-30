@@ -17,6 +17,7 @@
  * This is the virtual base address of the application image and should match the base address specified in the user.ld
 */
 #define USER_BASE 0x1000000 
+#define SCAUSE_ECALL 8
 
 
 
