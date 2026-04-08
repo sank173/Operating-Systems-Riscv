@@ -163,28 +163,6 @@ void kernel_entry(void){
 
     );
 }
-/*
-* In Riscv Exception is handled in this way 
-* The CPU checks for the medeleg register which decides which mode should handle the exception
-* In this case OpenSBI is capabale of handling the S/U mode exception in s mode handler 
-* CPU saves the registers in various CSRs
-* The value of stvec is set to the PC(program counter) to jump to the exception handler 
-* The exception handler saves the current register (gprs) and handles the exception
-* exception handler restores the saved excecution state and calls the sret instruction to resume the exection from the point where execution occured
-
-* Register Information
-* scaue --> type of exception , tells the type of exception occured
-* stval --> tells the exact adddress where the exception occured
-* sepc --> the Program counter at which exception occured 
-* sstatus --> tells the Operating mode (S/U mode) where the exception occurred
-*/
-void handle_trap(struct trap_frame *f){
-    uint32_t scause = READ_CSR(scause);
-    uint32_t stval = READ_CSR(stval);
-    uint32_t user_pc = READ_CSR(sepc);
-    PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n",scause,stval,user_pc);
-}
-
 struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long fid, long eid)
 {
     register long a0 __asm__("a0") = arg0;
@@ -205,6 +183,12 @@ void putchar(char ch)
 {
     sbi_call(ch, 0, 0, 0, 0, 0, 0, 1);
 }
+/* Sbi Provides the Interface to Recieve the Characters from the debug console*/
+long getchar(void){
+    struct sbiret ret = sbi_call(0,0,0,0,0,0,0,2);
+    return ret.error;
+}
+
 struct process procs[PROCS_MAX]; // All process control structures.
 
 void map_page(uint32_t *table1 , uint32_t vaddr , paddr_t paddr ,uint32_t flags){
@@ -331,6 +315,60 @@ void proc_b_entry(void) {
         putchar('B');
         yeild();
     }
+}
+void handle_syscall(struct trap_frame*f){
+    switch (f->a3)
+    {
+    case SYS_PUTCHAR:
+        putchar(f->a0);
+        break;
+    case SYS_GETCHAR:
+     while(1){
+        long ch = getchar();
+        if(ch >=0){
+            f->a0 = ch;
+            break;
+        }
+        yeild();
+     }
+     break;
+    case SYS_EXIT:
+    printf("process %d exited \n",current_proc->pid);
+    current_proc->state = PROC_EXITED;
+    yeild();
+    PANIC("unreachable");
+    
+    default:
+         PANIC("unexpected syscall a3=%x\n", f->a3);
+    }
+}
+/*
+* In Riscv Exception is handled in this way 
+* The CPU checks for the medeleg register which decides which mode should handle the exception
+* In this case OpenSBI is capabale of handling the S/U mode exception in s mode handler 
+* CPU saves the registers in various CSRs
+* The value of stvec is set to the PC(program counter) to jump to the exception handler 
+* The exception handler saves the current register (gprs) and handles the exception
+* exception handler restores the saved excecution state and calls the sret instruction to resume the exection from the point where execution occured
+
+* Register Information
+* scaue --> type of exception , tells the type of exception occured
+* stval --> tells the exact adddress where the exception occured
+* sepc --> the Program counter at which exception occured 
+* sstatus --> tells the Operating mode (S/U mode) where the exception occurred
+*/
+void handle_trap(struct trap_frame *f){
+    uint32_t scause = READ_CSR(scause);
+    uint32_t stval = READ_CSR(stval);
+    uint32_t user_pc = READ_CSR(sepc);
+    if(scause == SCAUSE_ECALL){
+        handle_syscall(f);
+        user_pc+=4;
+    }
+    else{
+         PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n",scause,stval,user_pc);
+    }
+    WRITE_CSR(sepc,user_pc);  
 }
 /**
  * llvm-addr2line -e kernel.elf 8020015e --> comannd line which tells at which line in the code the exception occured , use the sepc value

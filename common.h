@@ -6,6 +6,10 @@
 #define va_end   __builtin_va_end
 #define va_arg   __builtin_va_arg
 
+#define SYS_PUTCHAR 1
+#define SYS_GETCHAR 2
+#define SYS_EXIT 3
+
 
 typedef int bool;
 typedef unsigned char uint8_t;
